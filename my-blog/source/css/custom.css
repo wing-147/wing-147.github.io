@@ -1,0 +1,10 @@
+/* Butterfly's default search divider is a dashed line with a moving scissors icon. */
+.search-dialog hr,
+.search-dialog hr::before {
+  display: none;
+}
+
+/* Keep the settings gear visible without continuously rotating it. */
+#rightside-config .fa-cog {
+  animation: none;
+}

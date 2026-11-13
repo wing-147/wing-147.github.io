@@ -6,14 +6,14 @@
 title: wing
 subtitle: ''
 description: '一个pwn手的学习记录'
-keywords: ''
+keywords: 'PWN, CTF, 二进制安全, 漏洞研究'
 author: wing
 language: zh-CN
-timezone: ''
+timezone: Asia/Shanghai
 
 # URL
 ## Set your site url here. For example, if you use GitHub Page, set url as 'https://username.github.io/project'
-url: http://example.com
+url: https://wing-147.github.io
 permalink: :year/:month/:day/:title/
 permalink_defaults:
 pretty_urls:
