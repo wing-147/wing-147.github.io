@@ -54,19 +54,15 @@ function assertCustomStyles() {
   );
 }
 
-function assertVisitorCounterUsesAvailableService() {
-  const html = readFileSync(join(publicRoot, 'index.html'), 'utf8');
-
-  assert.doesNotMatch(
-    html,
-    /busuanzi\.ibruce\.info/,
-    'homepage still loads the unreliable default Busuanzi service'
-  );
-  assert.match(
-    html,
-    /<script[^>]+src="https:\/\/busuanzi\.icodeq\.com\/busuanzi\.pure\.mini\.js"/,
-    'homepage does not load the configured Busuanzi-compatible counter'
-  );
+function assertVisitorCounterIsDisabled() {
+  for (const htmlPath of walk(publicRoot, '.html')) {
+    const html = readFileSync(htmlPath, 'utf8');
+    assert.doesNotMatch(
+      html,
+      /busuanzi(?:_value|\.|\/)/i,
+      `${htmlPath} still contains a Busuanzi counter or network request`
+    );
+  }
 }
 
 function assertFooterImageIsConfigured() {
@@ -174,7 +170,7 @@ function assertPagesWorkflow() {
 
 assertGeneratedMetadata();
 assertCustomStyles();
-assertVisitorCounterUsesAvailableService();
+assertVisitorCounterIsDisabled();
 assertFooterImageIsConfigured();
 assertGeneratedAssetsExist();
 assertMarkdownImagePaths();

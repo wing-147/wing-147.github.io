@@ -53,6 +53,12 @@ footer:
     owner:
         since: 2025
 
+# Disable all third-party visitor and page-view counters.
+busuanzi:
+    site_uv: false
+    site_pv: false
+    page_pv: false
+
 # Aside
 aside:
     card_author:
@@ -69,8 +75,3 @@ lightbox: medium_zoom
 inject:
     head:
         - <link rel="stylesheet" href="/css/custom.css">
-
-# Replace Butterfly's unreliable default Busuanzi endpoint.
-CDN:
-    option:
-        busuanzi: https://busuanzi.icodeq.com/busuanzi.pure.mini.js
