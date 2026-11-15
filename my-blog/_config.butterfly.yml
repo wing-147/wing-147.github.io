@@ -84,6 +84,10 @@ aside:
 
 lightbox: medium_zoom
 
+lazyload:
+    enable: true
+    field: site
+
 # Custom styles
 inject:
     head:
