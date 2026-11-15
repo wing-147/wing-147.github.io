@@ -74,6 +74,32 @@ function assertFooterImageIsConfigured() {
   assert.ok(existsSync(imagePath), `homepage footer image is missing: ${match[1]}`);
 }
 
+function assertPostFooterUsesAdjacentNavigation() {
+  const postPath = join(publicRoot, '2025', '05', '08', 'miniLCTF2025-WP', 'index.html');
+  assert.ok(existsSync(postPath), 'reference post is missing from the generated site');
+
+  const html = readFileSync(postPath, 'utf8');
+  assert.doesNotMatch(html, /class="post-copyright"/, 'post footer still contains the copyright notice');
+  assert.doesNotMatch(html, /class="post-meta__tag-list"/, 'post footer still contains the tag list');
+  assert.doesNotMatch(html, /class="post-share"/, 'post footer still contains social sharing links');
+  assert.match(html, /<nav class="pagination-post"/, 'post footer must keep adjacent-post navigation enabled');
+
+  const previewPosts = [
+    join(blogRoot, 'source', '_posts', 'temp-previous-post.md'),
+    join(blogRoot, 'source', '_posts', 'temp-next-post.md')
+  ];
+  if (previewPosts.every(existsSync)) {
+    const adjacentLinks = html.match(/<a class="pagination-related"[\s\S]*?<\/a>/g) ?? [];
+    assert.equal(adjacentLinks.length, 2, 'reference post must link to both adjacent posts');
+    assert.match(html, /TEMP Previous Post/, 'reference post is missing its older adjacent post');
+    assert.match(html, /TEMP Next Post/, 'reference post is missing its newer adjacent post');
+    const previousLink = adjacentLinks.find(link => link.includes('>上一篇</div>')) ?? '';
+    const nextLink = adjacentLinks.find(link => link.includes('>下一篇</div>')) ?? '';
+    assert.match(previousLink, /TEMP Previous Post/, 'previous-post link must point to the older post');
+    assert.match(nextLink, /TEMP Next Post/, 'next-post link must point to the newer post');
+  }
+}
+
 function assertGeneratedAssetsExist() {
   const mainStylesheet = join(publicRoot, 'css', 'index.css');
   assert.ok(existsSync(mainStylesheet), 'generated main stylesheet is missing');
@@ -156,22 +182,30 @@ function assertPagesWorkflow() {
   const buildSteps = workflow.jobs?.build?.steps ?? [];
   const checkout = buildSteps.find(step => String(step.uses).startsWith('actions/checkout@'));
   const setupNode = buildSteps.find(step => String(step.uses).startsWith('actions/setup-node@'));
+  const configurePages = buildSteps.find(step => String(step.uses).startsWith('actions/configure-pages@'));
   const upload = buildSteps.find(step => String(step.uses).startsWith('actions/upload-pages-artifact@'));
+  const deploySteps = workflow.jobs?.deploy?.steps ?? [];
+  const deployPages = deploySteps.find(step => String(step.uses).startsWith('actions/deploy-pages@'));
   const runCommands = buildSteps.filter(step => step.run).map(step => step.run).join('\n');
 
+  assert.equal(workflow.jobs?.build?.['runs-on'], 'ubuntu-24.04', 'Pages build must use the pinned Ubuntu 24.04 runner');
+  assert.equal(workflow.jobs?.deploy?.['runs-on'], 'ubuntu-24.04', 'Pages deployment must use the pinned Ubuntu 24.04 runner');
   assert.equal(checkout?.with?.submodules, 'recursive', 'Pages checkout must include the Butterfly submodule');
   assert.equal(setupNode?.with?.['node-version-file'], 'my-blog/.nvmrc', 'Pages workflow must use the project Node version');
+  assert.equal(configurePages?.uses, 'actions/configure-pages@v6', 'Pages configuration must use the Node.js 24 action');
   assert.match(runCommands, /npm ci/, 'Pages workflow must install the locked dependencies');
   assert.match(runCommands, /npm run build/, 'Pages workflow must build the site');
   assert.match(runCommands, /npm test/, 'Pages workflow must run the blog checks');
   assert.equal(upload?.with?.path, 'my-blog/public', 'Pages workflow must upload the generated site');
   assert.ok(workflow.jobs?.deploy?.needs === 'build', 'Pages deployment must wait for the build');
+  assert.equal(deployPages?.uses, 'actions/deploy-pages@v5', 'Pages deployment must use the Node.js 24 action');
 }
 
 assertGeneratedMetadata();
 assertCustomStyles();
 assertVisitorCounterIsDisabled();
 assertFooterImageIsConfigured();
+assertPostFooterUsesAdjacentNavigation();
 assertGeneratedAssetsExist();
 assertMarkdownImagePaths();
 assertThemeCheckoutIsReproducible();

@@ -44,9 +44,22 @@ category_img: /images/wallpaper/category.png
 default_top_img: /images/wallpaper/loading.jpg
 footer_img: /images/wallpaper/footer.jpg
 
-# Post copyright
+# Post footer
 post_copyright:
-    author_href: https://github.com/wing-147
+    enable: false
+
+post_meta:
+    post:
+        tags: false
+
+share:
+    use:
+
+related_post:
+    enable: false
+
+# 上一篇指向较旧的文章，下一篇指向较新的文章
+post_pagination: 1
 
 # Footer
 footer:
