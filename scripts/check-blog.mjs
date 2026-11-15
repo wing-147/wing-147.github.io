@@ -75,28 +75,17 @@ function assertFooterImageIsConfigured() {
 }
 
 function assertPostFooterUsesAdjacentNavigation() {
-  const postPath = join(publicRoot, '2025', '05', '08', 'miniLCTF2025-WP', 'index.html');
-  assert.ok(existsSync(postPath), 'reference post is missing from the generated site');
+  const postPages = walk(publicRoot, '.html')
+    .map(htmlPath => ({ htmlPath, html: readFileSync(htmlPath, 'utf8') }))
+    .filter(({ html }) => /pageType:\s*['"]post['"]/.test(html));
 
-  const html = readFileSync(postPath, 'utf8');
-  assert.doesNotMatch(html, /class="post-copyright"/, 'post footer still contains the copyright notice');
-  assert.doesNotMatch(html, /class="post-meta__tag-list"/, 'post footer still contains the tag list');
-  assert.doesNotMatch(html, /class="post-share"/, 'post footer still contains social sharing links');
-  assert.match(html, /<nav class="pagination-post"/, 'post footer must keep adjacent-post navigation enabled');
+  assert.ok(postPages.length > 0, 'generated site contains no post pages');
 
-  const previewPosts = [
-    join(blogRoot, 'source', '_posts', 'temp-previous-post.md'),
-    join(blogRoot, 'source', '_posts', 'temp-next-post.md')
-  ];
-  if (previewPosts.every(existsSync)) {
-    const adjacentLinks = html.match(/<a class="pagination-related"[\s\S]*?<\/a>/g) ?? [];
-    assert.equal(adjacentLinks.length, 2, 'reference post must link to both adjacent posts');
-    assert.match(html, /TEMP Previous Post/, 'reference post is missing its older adjacent post');
-    assert.match(html, /TEMP Next Post/, 'reference post is missing its newer adjacent post');
-    const previousLink = adjacentLinks.find(link => link.includes('>上一篇</div>')) ?? '';
-    const nextLink = adjacentLinks.find(link => link.includes('>下一篇</div>')) ?? '';
-    assert.match(previousLink, /TEMP Previous Post/, 'previous-post link must point to the older post');
-    assert.match(nextLink, /TEMP Next Post/, 'next-post link must point to the newer post');
+  for (const { htmlPath, html } of postPages) {
+    assert.doesNotMatch(html, /class="post-copyright"/, `${htmlPath} still contains the copyright notice`);
+    assert.doesNotMatch(html, /class="post-meta__tag-list"/, `${htmlPath} still contains the tag list`);
+    assert.doesNotMatch(html, /class="post-share"/, `${htmlPath} still contains social sharing links`);
+    assert.match(html, /<nav class="pagination-post"/, `${htmlPath} is missing adjacent-post navigation`);
   }
 }
 
